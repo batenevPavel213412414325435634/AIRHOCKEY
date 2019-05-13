@@ -1,0 +1,167 @@
+from tkinter import *
+import random
+
+WIDTH = 1100
+HEIGHT = 450
+
+STICK_W = 10
+STICK_H = 100
+
+WASHER_SPEED_INCR = 1.05
+WASHER_MAX_SPEED = 40
+WASHER_RAD = 35
+
+INIT_SPEED = 13
+WASHER_X_SPEED = INIT_SPEED
+WASHER_Y_SPEED = INIT_SPEED
+
+
+PLAYER1_SCORE = 0
+PLAYER2_SCORE = 0
+
+WASHER_X_CHAN = 20
+WASHER_Y_CHAN = 0
+
+NOTE_SPEED = 20
+LEFT_NOTE_SPEED = 0
+RIGHT_NOTE_SPEED = 0
+
+root = Tk()
+root.title("AIR_HOCKEY for FRIENDS")
+
+c = Canvas(root, width=WIDTH, height=HEIGHT, background="#1b67e0")
+c.pack()
+
+right_distance = WIDTH - STICK_W
+
+
+def refresh_score(player):
+    global PLAYER1_SCORE, PLAYER2_SCORE
+    if player == "right":
+        PLAYER1_SCORE += 1
+        c.itemconfig(p_1_text, text=PLAYER1_SCORE)
+    else:
+        PLAYER2_SCORE += 1
+        c.itemconfig(p_2_text, text=PLAYER2_SCORE)
+
+
+def position_washer():
+    global WASHER_X_SPEED
+
+    c.coords(WASHER, WIDTH / 2 - WASHER_RAD / 2, HEIGHT / 2 - WASHER_RAD / 2, WIDTH / 2 + WASHER_RAD / 2,
+             HEIGHT / 2 + WASHER_RAD / 2)
+    WASHER_X_SPEED = -(WASHER_X_SPEED * -INIT_SPEED) / abs(WASHER_X_SPEED)
+
+
+def bounce(action):
+    global WASHER_X_SPEED, WASHER_Y_SPEED
+    if action == "hit":
+        WASHER_Y_SPEED = random.randrange(-10, 10)
+        if abs(WASHER_X_SPEED) < WASHER_MAX_SPEED:
+            WASHER_X_SPEED *= -WASHER_SPEED_INCR
+        else:
+            WASHER_X_SPEED = -WASHER_X_SPEED
+    else:
+        WASHER_Y_SPEED = -WASHER_Y_SPEED
+
+
+# элементы игрового поля
+c.create_line(STICK_W, 0, STICK_W, HEIGHT, dash=(4, 2), width=5, fill="white")
+c.create_line(WIDTH - STICK_W, 0, WIDTH - STICK_W, HEIGHT, dash=(4, 2), width=5, fill="white")
+c.create_line(WIDTH / 2, 0, WIDTH / 2, HEIGHT, width=5, fill="white")
+
+# установка игровых объектов
+
+WASHER = c.create_oval(WIDTH / 2 - WASHER_RAD / 2, HEIGHT / 2 - WASHER_RAD / 2, WIDTH / 2 + WASHER_RAD / 2,
+                       HEIGHT / 2 + WASHER_RAD / 2, fill="white")
+LEFT_NOTE = c.create_line(STICK_W / 2, 0, STICK_W / 2, STICK_H, width=STICK_W, fill="red")
+
+RIGHT_NOTE = c.create_line(WIDTH - STICK_W / 2, 0, WIDTH - STICK_W / 2, STICK_H, width=STICK_W, fill="green")
+
+p_1_text = c.create_text(WIDTH - WIDTH / 6, STICK_H / 4, text=PLAYER1_SCORE, font="Arial 20", fill="white")
+
+p_2_text = c.create_text(WIDTH / 6, STICK_H / 4, text=PLAYER2_SCORE, font="Arial 20", fill="white")
+
+
+def move_washer():
+    washer_left, washer_top, washer_right, washer_bot = c.coords(WASHER)
+    washer_center = (washer_top + washer_bot) / 2
+
+    if washer_right + WASHER_X_SPEED < right_distance and washer_left + WASHER_X_SPEED > STICK_W:
+        c.move(WASHER, WASHER_X_SPEED, WASHER_Y_SPEED)
+
+    elif washer_right == right_distance or washer_left == STICK_W:
+        if washer_right > WIDTH / 2:
+
+            if c.coords(RIGHT_NOTE)[1] < washer_center < c.coords(RIGHT_NOTE)[3]:
+                bounce("hit")
+            else:
+                refresh_score("left")
+                position_washer()
+        else:
+            if c.coords(LEFT_NOTE)[1] < washer_center < c.coords(LEFT_NOTE)[3]:
+                bounce("hit")
+            else:
+                refresh_score("right")
+                position_washer()
+    else:
+        if washer_right > WIDTH / 2:
+            c.move(WASHER, right_distance - washer_right, WASHER_Y_SPEED)
+        else:
+            c.move(WASHER, -washer_left + STICK_W, WASHER_Y_SPEED)
+    # горизонтальный отскок
+    if washer_top + WASHER_Y_SPEED < 0 or washer_bot + WASHER_Y_SPEED > HEIGHT:
+        bounce("rebound")
+
+
+def move_notes():
+    NOTES = {LEFT_NOTE: LEFT_NOTE_SPEED, RIGHT_NOTE: RIGHT_NOTE_SPEED}
+
+    for note in NOTES:
+        c.move(note, 0, NOTES[note])
+        if c.coords(note)[1] < 0:
+            c.move(note, 0, -c.coords(note)[1])
+        elif c.coords(note)[3] > HEIGHT:
+            c.move(note, 0, HEIGHT - c.coords(note)[3])
+
+
+def main():
+    move_washer()
+    move_notes()
+    root.after(30, main)
+
+
+c.focus_set()
+
+
+# Напишем функцию обработки нажатия клавиш.
+def movevent_processor(event):
+    global LEFT_NOTE_SPEED, RIGHT_NOTE_SPEED
+    if event.keysym == "w":
+        LEFT_NOTE_SPEED = -NOTE_SPEED
+    elif event.keysym == "s":
+        LEFT_NOTE_SPEED = NOTE_SPEED
+
+    elif event.keysym == "Up":
+        RIGHT_NOTE_SPEED = -NOTE_SPEED
+    elif event.keysym == "Down":
+        RIGHT_NOTE_SPEED = NOTE_SPEED
+
+
+c.bind("<KeyPress>", movevent_processor)
+
+
+# Создадим функцию реагирования на отпускание клавиши
+def stop_note(event):
+    global LEFT_NOTE_SPEED, RIGHT_NOTE_SPEED
+    if event.keysym in "ws":
+        LEFT_NOTE_SPEED = 0
+
+    elif event.keysym in ("Up", "Down"):
+        RIGHT_NOTE_SPEED = 0
+
+
+c.bind("<KeyRelease>", stop_note)
+
+main()
+root.mainloop()
